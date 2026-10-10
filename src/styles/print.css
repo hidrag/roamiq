@@ -1,0 +1,101 @@
+/*
+ * RoamIQ print stylesheet.
+ *
+ * Strategy: hide everything during print, then reveal only the .print-only
+ * export sheet. This strips navs, buttons, tabs, floating bars and the Leaflet
+ * map (avoids tile/canvas corruption) without touching every element.
+ */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /* Hide the entire interactive app shell ... */
+  body * {
+    visibility: hidden;
+  }
+
+  /* ... except the export sheet and everything inside it. */
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+
+  .print-only {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    background: #fff;
+  }
+
+  /* Ink-friendly typography for the sheet. */
+  .print-only h1 {
+    font-size: 20pt;
+    margin-bottom: 4pt;
+  }
+
+  .print-only h2 {
+    font-size: 14pt;
+    margin: 12pt 0 6pt;
+    border-bottom: 1pt solid #444;
+    padding-bottom: 2pt;
+  }
+
+  .print-only h3 {
+    font-size: 11.5pt;
+    margin: 8pt 0 4pt;
+  }
+
+  .print-only p,
+  .print-only li,
+  .print-only td,
+  .print-only th {
+    font-size: 10pt;
+    line-height: 1.45;
+    color: #111;
+  }
+
+  .print-only table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8pt;
+  }
+
+  .print-only th,
+  .print-only td {
+    border: 0.5pt solid #999;
+    padding: 4pt 6pt;
+    text-align: left;
+  }
+
+  /* Page-break management: never split a stop or day across pages. */
+  .print-activity,
+  .print-day,
+  .print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-day {
+    break-before: auto;
+  }
+
+  /* Belt-and-braces: guarantee interactive overlays never print. */
+  nav,
+  header nav,
+  [role='dialog'],
+  .leaflet-container,
+  button {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

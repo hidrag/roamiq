@@ -1,27 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CreateTripModal } from '@/features/trips/components/CreateTripModal'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
+import { fetchTrips, tripKeys } from '@/features/trips/tripService'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { formatDate } from '@/lib/utils'
-import type { Trip } from '@/types/database'
-
-async function fetchTrips(userId: string): Promise<Trip[]> {
-  const { data, error } = await supabase
-    .from('trips')
-    .select('*')
-    .or(`owner_id.eq.${userId},id.in.(select trip_id from trip_members where user_id.eq.${userId})`)
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as Trip[]
-}
 
 export function TripsPage() {
+  const [modalOpen, setModalOpen] = useState(false)
   const user = useAuthStore((s) => s.user)
   const query = useQuery({
-    queryKey: ['trips', user?.id],
+    queryKey: tripKeys.trips(user?.id ?? ''),
     queryFn: () => fetchTrips(user!.id),
     enabled: Boolean(user),
   })
@@ -51,13 +43,13 @@ export function TripsPage() {
               : `${trips.length} trip${trips.length === 1 ? '' : 's'} planned.`}
           </p>
         </div>
-        <Button asChild>
-          <Link to="/trips/new">
-            <Plus className="h-4 w-4" />
-            New trip
-          </Link>
+        <Button onClick={() => setModalOpen(true)}>
+          <Plus className="h-4 w-4" />
+          New trip
         </Button>
       </div>
+
+      <CreateTripModal open={modalOpen} onOpenChange={setModalOpen} />
 
       {trips.length === 0 ? (
         <Card>
@@ -80,7 +72,6 @@ export function TripsPage() {
                 <p>
                   {formatDate(trip.start_date)} → {formatDate(trip.end_date)}
                 </p>
-                <p className="capitalize">{trip.status}</p>
                 <Button asChild variant="outline" size="sm" className="w-full">
                   <Link to={`/trips/${trip.id}`}>Open planner</Link>
                 </Button>

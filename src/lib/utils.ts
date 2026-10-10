@@ -5,6 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Round to 2 decimal places — never accumulate raw floats for money. */
+export function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+/** Sum a list of money amounts safely (rounds each addend, rounds the total). */
+export function sumMoney(values: number[]): number {
+  return roundMoney(values.reduce((total, value) => total + roundMoney(value), 0))
+}
+
+/** Normalize a display title for safe rendering (strips markup characters). */
+export function sanitizeDisplayTitle(raw: string): string {
+  return raw.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160)
+}
+
 /** Format an ISO date string as e.g. "12 Nov 2026". */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'

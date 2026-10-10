@@ -10,4 +10,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('leaflet')) return 'map'
+          if (id.includes('node_modules/@supabase')) return 'supabase'
+          if (id.includes('node_modules/@tanstack')) return 'query'
+          if (id.includes('node_modules/@radix-ui')) return 'radix'
+          if (id.includes('node_modules')) return 'vendor'
+          return undefined
+        },
+      },
+    },
+  },
 })

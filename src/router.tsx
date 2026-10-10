@@ -5,7 +5,7 @@ import { LandingPage } from '@/features/landing/LandingPage'
 import { ExplorePage } from '@/features/explore/ExplorePage'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { TripsPage } from '@/features/trips/TripsPage'
-import { TripPlannerPage } from '@/features/trips/TripPlannerPage'
+import { TripDetailsPage } from '@/features/trips/pages/TripDetailsPage'
 
 export function AppRoutes() {
   return (
@@ -26,7 +26,7 @@ export function AppRoutes() {
           path="/trips/:id"
           element={
             <AuthGuard>
-              <TripPlannerPage />
+              <TripDetailsPage />
             </AuthGuard>
           }
         />

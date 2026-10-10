@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -27,6 +28,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 47.4% 11.2%;
@@ -47,15 +49,25 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 199 89% 55%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Native select/option legibility across themes */
+  select,
+  option {
+    color: inherit;
+    background: inherit;
+    border: inherit;
+    font: inherit;
+  }
+  option {
+    padding: 0.25em 0.5em;
   }
 }
 

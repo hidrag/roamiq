@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Compass, LogOut, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ModeToggle } from '@/components/layout/ModeToggle'
+import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { cn } from '@/lib/utils'
 
@@ -58,7 +58,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <ModeToggle />
+          <ThemeToggle />
           {user ? (
             <div className="hidden items-center gap-2 md:flex">
               <Avatar className="h-8 w-8">

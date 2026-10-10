@@ -10,6 +10,8 @@ export interface MapStop {
   title: string
   position: LatLngTuple
   dayNumber: number
+  /** Optional one-line detail shown inside the popup. */
+  detail?: string
 }
 
 interface MapViewProps {
@@ -17,46 +19,88 @@ interface MapViewProps {
   /** Center used when there are no stops yet. */
   fallbackCenter?: LatLngTuple
   fallbackZoom?: number
+  /** Sticky selection: marker enlarges, popup opens, map flies to it. */
   selectedStopId?: string | null
+  /** Hover preview: gentle pan, no zoom change. */
+  hoveredStopId?: string | null
   onSelectStop?: (id: string) => void
-  /** When set, the map flies to this stop on change (itinerary <-> map sync). */
-  focusStopId?: string | null
+  /** Bump to re-fly to the same stop (repeat clicks). */
+  focusNonce?: number
+  /** Only stops of this day get the route polyline; 'all' disables it. */
+  polylineDay?: number | 'all'
   className?: string
 }
 
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
-/** Fly the map when the focused stop changes; invalidate size on mount. */
-function MapController({
+const FLY_ZOOM = 15
+
+interface SyncControllerProps {
+  stops: MapStop[]
+  selectedStopId: string | null
+  hoveredStopId: string | null
+  focusNonce: number
+  markerRefs: React.MutableRefObject<Map<string, L.Marker>>
+}
+
+/** Imperative map behaviors: fly + openPopup on selection, gentle pan on hover. */
+function MapSyncController({
   stops,
-  focusStopId,
-}: Pick<MapViewProps, 'stops' | 'focusStopId'>) {
+  selectedStopId,
+  hoveredStopId,
+  focusNonce,
+  markerRefs,
+}: SyncControllerProps) {
   const map = useMap()
   const didInitialFit = useRef(false)
 
+  // Fix mis-measured containers (tab switches, StrictMode double-render).
   useEffect(() => {
-    // Leaflet mis-measures containers that mount at 0 height (tab switching,
-    // StrictMode double-render). A deferred invalidateSize fixes both.
     const timer = window.setTimeout(() => map.invalidateSize(), 100)
     return () => window.clearTimeout(timer)
   }, [map])
 
+  // Initial fit to all stops.
   useEffect(() => {
-    if (focusStopId) {
-      const stop = stops.find((s) => s.id === focusStopId)
-      if (stop) map.flyTo(stop.position, Math.max(map.getZoom(), 14), { duration: 0.8 })
-      return
+    if (didInitialFit.current || stops.length === 0) return
+    didInitialFit.current = true
+    if (stops.length === 1) {
+      map.setView(stops[0].position, FLY_ZOOM)
+    } else {
+      map.fitBounds(L.latLngBounds(stops.map((s) => s.position)), { padding: [48, 48] })
     }
-    if (!didInitialFit.current && stops.length > 0) {
-      didInitialFit.current = true
-      if (stops.length === 1) {
-        map.setView(stops[0].position, 13)
-      } else {
-        map.fitBounds(L.latLngBounds(stops.map((s) => s.position)), { padding: [48, 48] })
-      }
+  }, [map, stops])
+
+  // Selection: fly + open popup (focusNonce re-triggers repeat selections).
+  useEffect(() => {
+    if (!selectedStopId) return
+    const stop = stops.find((s) => s.id === selectedStopId)
+    if (!stop) return
+    map.flyTo(stop.position, Math.max(map.getZoom(), FLY_ZOOM), { duration: 0.8 })
+    const marker = markerRefs.current.get(selectedStopId)
+    if (marker) {
+      // Open slightly after the fly begins so the popup lands on-screen.
+      const timer = window.setTimeout(() => marker.openPopup(), 350)
+      return () => window.clearTimeout(timer)
     }
-  }, [map, stops, focusStopId])
+  }, [map, stops, selectedStopId, focusNonce, markerRefs])
+
+  // Hover: panTo only when the point is outside the safe center zone.
+  useEffect(() => {
+    if (!hoveredStopId || hoveredStopId === selectedStopId) return
+    const stop = stops.find((s) => s.id === hoveredStopId)
+    if (!stop) return
+    const point = map.latLngToContainerPoint(stop.position)
+    const size = map.getSize()
+    const margin = 60
+    const inside =
+      point.x >= margin &&
+      point.x <= size.x - margin &&
+      point.y >= margin &&
+      point.y <= size.y - margin
+    if (!inside) map.panTo(stop.position, { animate: true, duration: 0.5 })
+  }, [map, stops, hoveredStopId, selectedStopId])
 
   return null
 }
@@ -66,33 +110,31 @@ export function MapView({
   fallbackCenter = [20, 0],
   fallbackZoom = 2,
   selectedStopId = null,
+  hoveredStopId = null,
   onSelectStop,
-  focusStopId = null,
+  focusNonce = 0,
+  polylineDay = 'all',
   className,
 }: MapViewProps) {
   const center: LatLngExpression = stops[0]?.position ?? fallbackCenter
+  const markerRefs = useRef(new Map<string, L.Marker>())
 
   const orderedStops = useMemo(
     () => [...stops].sort((a, b) => a.dayNumber - b.dayNumber),
     [stops],
   )
 
-  const routeLine = useMemo(
-    () =>
-      orderedStops.length > 1
-        ? orderedStops.filter((s) => s.dayNumber === orderedStops[0].dayNumber).map((s) => s.position)
-        : [],
-    [orderedStops],
-  )
+  const routeLine = useMemo(() => {
+    if (polylineDay === 'all') return []
+    return orderedStops.filter((s) => s.dayNumber === polylineDay).map((s) => s.position)
+  }, [orderedStops, polylineDay])
 
   return (
-    <div className={cn('h-[420px] w-full md:h-[560px]', className)}>
+    <div className={cn('h-full w-full', className)}>
       <MapContainer
         center={center}
         zoom={fallbackZoom}
         scrollWheelZoom
-        // react-leaflet v4 guards double-init, but StrictMode remounts share
-        // the same DOM node; keying by a stable id makes remounts explicit.
         className="h-full w-full"
       >
         <TileLayer
@@ -101,7 +143,10 @@ export function MapView({
           maxZoom={19}
         />
         {routeLine.length > 1 && (
-          <Polyline positions={routeLine} pathOptions={{ color: '#0ea5e9', weight: 3, dashArray: '6 8' }} />
+          <Polyline
+            positions={routeLine}
+            pathOptions={{ color: '#0ea5e9', weight: 3, dashArray: '6 8', opacity: 0.75 }}
+          />
         )}
         {orderedStops.map((stop) => (
           <Marker
@@ -109,15 +154,26 @@ export function MapView({
             position={stop.position}
             icon={createStopPin(stop.id === selectedStopId)}
             eventHandlers={{ click: () => onSelectStop?.(stop.id) }}
+            ref={(marker) => {
+              if (marker) markerRefs.current.set(stop.id, marker)
+              else markerRefs.current.delete(stop.id)
+            }}
           >
             <Popup>
               <span className="text-sm font-medium">
                 Day {stop.dayNumber} · {stop.title}
               </span>
+              {stop.detail && <span className="block text-xs opacity-80">{stop.detail}</span>}
             </Popup>
           </Marker>
         ))}
-        <MapController stops={orderedStops} focusStopId={focusStopId} />
+        <MapSyncController
+          stops={orderedStops}
+          selectedStopId={selectedStopId}
+          hoveredStopId={hoveredStopId}
+          focusNonce={focusNonce}
+          markerRefs={markerRefs}
+        />
       </MapContainer>
     </div>
   )
